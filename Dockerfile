@@ -1,9 +1,7 @@
 # Start from a Debian image with the latest version of Go installed
 # and a workspace (GOPATH) configured at /go.
 FROM marcbachmann/libvips:latest
-MAINTAINER tomas@aparicio.me
-
-ADD ~/aws/ ~/aws/
+MAINTAINER hafeez@ceribs.com
 
 # Server port to listen
 ENV PORT 9000
@@ -16,6 +14,10 @@ RUN apt-get update && apt-get install -y \
     gcc curl git libc6-dev make ca-certificates \
     --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -q
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -qy python-pip groff-base
+RUN pip install awscli
 
 ENV GOLANG_DOWNLOAD_URL https://golang.org/dl/go$GOLANG_VERSION.linux-amd64.tar.gz
 ENV GOLANG_DOWNLOAD_SHA256 43ad621c9b014cde8db17393dc108378d37bc853aa351a6c74bf6432c1bbd182
@@ -33,10 +35,11 @@ WORKDIR $GOPATH
 
 # Fetch the latest version of the package
 RUN go get -u golang.org/x/net/context
-RUN go get -u github.com/h2non/imaginary
+RUN go get -u github.com/hafeez1042/imaginary
 
 # Run the outyet command by default when the container starts.
 ENTRYPOINT ["/go/bin/imaginary"]
 
 # Expose the server TCP port
 EXPOSE 9000
+
