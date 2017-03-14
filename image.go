@@ -1,8 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"os"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 
 	"gopkg.in/h2non/bimg.v1"
 )
@@ -11,6 +19,12 @@ import (
 type Image struct {
 	Body []byte
 	Mime string
+}
+
+// Save store details for saving an image to S3
+type save struct {
+	BucketName string
+	ImageName  string
 }
 
 // Operation implements an image transformation runnable interface
@@ -72,7 +86,16 @@ func Resize(buf []byte, o ImageOptions) (Image, error) {
 		opts.Crop = true
 	}
 
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+	fmt.Println("Bucket Name - ", o.BucketName)
+	fmt.Println(o.BucketName)
+	fmt.Println(o.ImageName)
+	return Process(buf, opts, save)
 }
 
 func Enlarge(buf []byte, o ImageOptions) (Image, error) {
@@ -87,7 +110,14 @@ func Enlarge(buf []byte, o ImageOptions) (Image, error) {
 		opts.Crop = true
 	}
 
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
 func Extract(buf []byte, o ImageOptions) (Image, error) {
@@ -101,7 +131,14 @@ func Extract(buf []byte, o ImageOptions) (Image, error) {
 	opts.AreaWidth = o.AreaWidth
 	opts.AreaHeight = o.AreaHeight
 
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
 func Crop(buf []byte, o ImageOptions) (Image, error) {
@@ -111,7 +148,14 @@ func Crop(buf []byte, o ImageOptions) (Image, error) {
 
 	opts := BimgOptions(o)
 	opts.Crop = true
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
 func Rotate(buf []byte, o ImageOptions) (Image, error) {
@@ -120,19 +164,40 @@ func Rotate(buf []byte, o ImageOptions) (Image, error) {
 	}
 
 	opts := BimgOptions(o)
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
 func Flip(buf []byte, o ImageOptions) (Image, error) {
 	opts := BimgOptions(o)
 	opts.Flip = true
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
 func Flop(buf []byte, o ImageOptions) (Image, error) {
 	opts := BimgOptions(o)
 	opts.Flop = true
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
 func Thumbnail(buf []byte, o ImageOptions) (Image, error) {
@@ -140,7 +205,14 @@ func Thumbnail(buf []byte, o ImageOptions) (Image, error) {
 		return Image{}, NewError("Missing required params: width or height", BadRequest)
 	}
 
-	return Process(buf, BimgOptions(o))
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, BimgOptions(o), save)
 }
 
 func Zoom(buf []byte, o ImageOptions) (Image, error) {
@@ -166,7 +238,14 @@ func Zoom(buf []byte, o ImageOptions) (Image, error) {
 	}
 
 	opts.Zoom = o.Factor
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
 func Convert(buf []byte, o ImageOptions) (Image, error) {
@@ -178,7 +257,14 @@ func Convert(buf []byte, o ImageOptions) (Image, error) {
 	}
 	opts := BimgOptions(o)
 
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
 func Watermark(buf []byte, o ImageOptions) (Image, error) {
@@ -199,10 +285,38 @@ func Watermark(buf []byte, o ImageOptions) (Image, error) {
 		opts.Watermark.Background = bimg.Color{o.Color[0], o.Color[1], o.Color[2]}
 	}
 
-	return Process(buf, opts)
+	save := save{}
+
+	if o.BucketName != "" && o.ImageName != "" {
+		save.BucketName = o.BucketName
+		save.ImageName = o.ImageName
+	}
+
+	return Process(buf, opts, save)
 }
 
-func Process(buf []byte, opts bimg.Options) (out Image, err error) {
+// func Save(buf []byte, o ImageOptions) (Image, error) {
+// 	if o.Width == 0 && o.Height == 0 {
+// 		return Image{}, NewError("Missing required param: height or width", BadRequest)
+// 	}
+// 	if o.BucketName == "" {
+// 		return Image{}, NewError("Missing required param: S3 Bucket name", BadRequest)
+// 	}
+// 	if o.ImageName == "" {
+// 		return Image{}, NewError("Missing required param: Image name", BadRequest)
+// 	}
+
+// 	opts := BimgOptions(o)
+// 	opts.Embed = true
+
+// 	if o.NoCrop == false {
+// 		opts.Crop = true
+// 	}
+// 	// uploadToS3("restapptest", buf)
+// 	return Process(buf, opts)
+// }
+
+func Process(buf []byte, opts bimg.Options, save save) (out Image, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch value := r.(type) {
@@ -222,6 +336,41 @@ func Process(buf []byte, opts bimg.Options) (out Image, err error) {
 		return Image{}, err
 	}
 
+	fmt.Println(save)
+	if save.BucketName != "" && save.ImageName != "" {
+		uploadToS3(save.BucketName, save.ImageName, buf)
+	}
 	mime := GetImageMimeType(bimg.DetermineImageType(buf))
 	return Image{Body: buf, Mime: mime}, nil
+}
+
+func uploadToS3(bucketName string, fileName string, buf []byte) {
+
+	fileBytes := bytes.NewReader(buf)
+	fileType := http.DetectContentType(buf)
+
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+
+	uploader := s3manager.NewUploader(sess)
+
+	_, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket:      aws.String(bucketName),
+		Key:         aws.String(fileName),
+		Body:        fileBytes,
+		ContentType: aws.String(fileType),
+	})
+	if err != nil {
+		// Print the error and exit.
+		exitErrorf("Unable to upload %q to %q, %v", fileName, bucketName, err)
+	}
+
+	fmt.Printf("Successfully uploaded %q to %q\n", fileName, bucketName)
+	return
+}
+
+func exitErrorf(msg string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, msg+"\n", args...)
+	os.Exit(1)
 }

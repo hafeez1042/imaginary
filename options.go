@@ -34,6 +34,8 @@ type ImageOptions struct {
 	Gravity     bimg.Gravity
 	Colorspace  bimg.Interpretation
 	Background  []uint8
+	ImageName   string
+	BucketName  string
 }
 
 // BimgOptions creates a new bimg compatible options struct mapping the fields properly

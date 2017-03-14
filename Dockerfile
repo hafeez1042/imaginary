@@ -3,6 +3,8 @@
 FROM marcbachmann/libvips:latest
 MAINTAINER tomas@aparicio.me
 
+ADD ~/aws/ ~/aws/
+
 # Server port to listen
 ENV PORT 9000
 
