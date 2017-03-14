@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -92,9 +90,6 @@ func Resize(buf []byte, o ImageOptions) (Image, error) {
 		save.BucketName = o.BucketName
 		save.ImageName = o.ImageName
 	}
-	fmt.Println("Bucket Name - ", o.BucketName)
-	fmt.Println(o.BucketName)
-	fmt.Println(o.ImageName)
 	return Process(buf, opts, save)
 }
 
@@ -336,15 +331,16 @@ func Process(buf []byte, opts bimg.Options, save save) (out Image, err error) {
 		return Image{}, err
 	}
 
-	fmt.Println(save)
 	if save.BucketName != "" && save.ImageName != "" {
-		uploadToS3(save.BucketName, save.ImageName, buf)
+		resp := uploadToS3(save.BucketName, save.ImageName, buf)
+		return Image{}, resp
+
 	}
 	mime := GetImageMimeType(bimg.DetermineImageType(buf))
 	return Image{Body: buf, Mime: mime}, nil
 }
 
-func uploadToS3(bucketName string, fileName string, buf []byte) {
+func uploadToS3(bucketName string, fileName string, buf []byte) error {
 
 	fileBytes := bytes.NewReader(buf)
 	fileType := http.DetectContentType(buf)
@@ -361,16 +357,7 @@ func uploadToS3(bucketName string, fileName string, buf []byte) {
 		Body:        fileBytes,
 		ContentType: aws.String(fileType),
 	})
-	if err != nil {
-		// Print the error and exit.
-		exitErrorf("Unable to upload %q to %q, %v", fileName, bucketName, err)
-	}
 
-	fmt.Printf("Successfully uploaded %q to %q\n", fileName, bucketName)
-	return
-}
+	return err
 
-func exitErrorf(msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, msg+"\n", args...)
-	os.Exit(1)
 }
