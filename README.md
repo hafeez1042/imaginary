@@ -73,6 +73,11 @@ To get started, take a look the [installation](#installation) steps, [usage](#us
 ## Installation
 
 ```bash
+go get -u github.com/hafeez1042/imaginary
+```
+
+Original
+```bash
 go get -u github.com/h2non/imaginary
 ```
 
@@ -102,6 +107,11 @@ docker pull h2non/imaginary
 Start the container with optional flags (default listening on port 9000)
 ```
 docker run -p 9000:9000 h2non/imaginary -cors -gzip
+```
+
+Start the container with AWS configuration and optional flags (default listening on port 9000)
+```
+docker run -p 9000:9000 --env AWS_ACCESS_KEY_ID=<AWS ACCESS KEY ID> --env AWS_SECRET_ACCESS_KEY=<AWS SECRET ACCESS KEY> --env AWS_DEFAULT_REGION=<aws-region> hafeez/imaginary -cors -gzip
 ```
 
 Start the container in debug mode:
