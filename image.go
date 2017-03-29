@@ -342,6 +342,7 @@ func Process(buf []byte, opts bimg.Options, save save) (out Image, err error) {
 
 func uploadToS3(bucketName string, fileName string, buf []byte) error {
 
+	acl := "public-read"
 	fileBytes := bytes.NewReader(buf)
 	fileType := http.DetectContentType(buf)
 
@@ -353,6 +354,7 @@ func uploadToS3(bucketName string, fileName string, buf []byte) error {
 
 	_, err := uploader.Upload(&s3manager.UploadInput{
 		Bucket:      aws.String(bucketName),
+		ACL:         aws.String(acl),
 		Key:         aws.String(fileName),
 		Body:        fileBytes,
 		ContentType: aws.String(fileType),
