@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awsutil"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 
@@ -26,10 +27,10 @@ type save struct {
 }
 
 // Operation implements an image transformation runnable interface
-type Operation func([]byte, ImageOptions) (Image, error)
+type Operation func([]byte, ImageOptions) (Image, string, error)
 
 // Run performs the image transformation
-func (o Operation) Run(buf []byte, opts ImageOptions) (Image, error) {
+func (o Operation) Run(buf []byte, opts ImageOptions) (Image, string, error) {
 	return o(buf, opts)
 }
 
@@ -45,14 +46,14 @@ type ImageInfo struct {
 	Orientation int    `json:"orientation"`
 }
 
-func Info(buf []byte, o ImageOptions) (Image, error) {
+func Info(buf []byte, o ImageOptions) (Image, string, error) {
 	// We're not handling an image here, but we reused the struct.
 	// An interface will be definitively better here.
 	image := Image{Mime: "application/json"}
 
 	meta, err := bimg.Metadata(buf)
 	if err != nil {
-		return image, NewError("Cannot retrieve image medatata: %s"+err.Error(), BadRequest)
+		return image, "", NewError("Cannot retrieve image medatata: %s"+err.Error(), BadRequest)
 	}
 
 	info := ImageInfo{
@@ -69,12 +70,12 @@ func Info(buf []byte, o ImageOptions) (Image, error) {
 	body, _ := json.Marshal(info)
 	image.Body = body
 
-	return image, nil
+	return image, "", nil
 }
 
-func Resize(buf []byte, o ImageOptions) (Image, error) {
+func Resize(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.Width == 0 && o.Height == 0 {
-		return Image{}, NewError("Missing required param: height or width", BadRequest)
+		return Image{}, "", NewError("Missing required param: height or width", BadRequest)
 	}
 
 	opts := BimgOptions(o)
@@ -93,9 +94,9 @@ func Resize(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Enlarge(buf []byte, o ImageOptions) (Image, error) {
+func Enlarge(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.Width == 0 || o.Height == 0 {
-		return Image{}, NewError("Missing required params: height, width", BadRequest)
+		return Image{}, "", NewError("Missing required params: height, width", BadRequest)
 	}
 
 	opts := BimgOptions(o)
@@ -115,9 +116,9 @@ func Enlarge(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Extract(buf []byte, o ImageOptions) (Image, error) {
+func Extract(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.AreaWidth == 0 || o.AreaHeight == 0 {
-		return Image{}, NewError("Missing required params: areawidth or areaheight", BadRequest)
+		return Image{}, "", NewError("Missing required params: areawidth or areaheight", BadRequest)
 	}
 
 	opts := BimgOptions(o)
@@ -136,9 +137,9 @@ func Extract(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Crop(buf []byte, o ImageOptions) (Image, error) {
+func Crop(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.Width == 0 && o.Height == 0 {
-		return Image{}, NewError("Missing required param: height or width", BadRequest)
+		return Image{}, "", NewError("Missing required param: height or width", BadRequest)
 	}
 
 	opts := BimgOptions(o)
@@ -153,9 +154,9 @@ func Crop(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Rotate(buf []byte, o ImageOptions) (Image, error) {
+func Rotate(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.Rotate == 0 {
-		return Image{}, NewError("Missing required param: rotate", BadRequest)
+		return Image{}, "", NewError("Missing required param: rotate", BadRequest)
 	}
 
 	opts := BimgOptions(o)
@@ -169,7 +170,7 @@ func Rotate(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Flip(buf []byte, o ImageOptions) (Image, error) {
+func Flip(buf []byte, o ImageOptions) (Image, string, error) {
 	opts := BimgOptions(o)
 	opts.Flip = true
 	save := save{}
@@ -182,7 +183,7 @@ func Flip(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Flop(buf []byte, o ImageOptions) (Image, error) {
+func Flop(buf []byte, o ImageOptions) (Image, string, error) {
 	opts := BimgOptions(o)
 	opts.Flop = true
 	save := save{}
@@ -195,9 +196,9 @@ func Flop(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Thumbnail(buf []byte, o ImageOptions) (Image, error) {
+func Thumbnail(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.Width == 0 && o.Height == 0 {
-		return Image{}, NewError("Missing required params: width or height", BadRequest)
+		return Image{}, "", NewError("Missing required params: width or height", BadRequest)
 	}
 
 	save := save{}
@@ -210,16 +211,16 @@ func Thumbnail(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, BimgOptions(o), save)
 }
 
-func Zoom(buf []byte, o ImageOptions) (Image, error) {
+func Zoom(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.Factor == 0 {
-		return Image{}, NewError("Missing required param: factor", BadRequest)
+		return Image{}, "", NewError("Missing required param: factor", BadRequest)
 	}
 
 	opts := BimgOptions(o)
 
 	if o.Top > 0 || o.Left > 0 {
 		if o.AreaWidth == 0 && o.AreaHeight == 0 {
-			return Image{}, NewError("Missing required params: areawidth, areaheight", BadRequest)
+			return Image{}, "", NewError("Missing required params: areawidth, areaheight", BadRequest)
 		}
 
 		opts.Top = o.Top
@@ -243,12 +244,12 @@ func Zoom(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Convert(buf []byte, o ImageOptions) (Image, error) {
+func Convert(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.Type == "" {
-		return Image{}, NewError("Missing required param: type", BadRequest)
+		return Image{}, "", NewError("Missing required param: type", BadRequest)
 	}
 	if ImageType(o.Type) == bimg.UNKNOWN {
-		return Image{}, NewError("Invalid image type: "+o.Type, BadRequest)
+		return Image{}, "", NewError("Invalid image type: "+o.Type, BadRequest)
 	}
 	opts := BimgOptions(o)
 
@@ -262,9 +263,9 @@ func Convert(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts, save)
 }
 
-func Watermark(buf []byte, o ImageOptions) (Image, error) {
+func Watermark(buf []byte, o ImageOptions) (Image, string, error) {
 	if o.Text == "" {
-		return Image{}, NewError("Missing required param: text", BadRequest)
+		return Image{}, "", NewError("Missing required param: text", BadRequest)
 	}
 
 	opts := BimgOptions(o)
@@ -311,7 +312,7 @@ func Watermark(buf []byte, o ImageOptions) (Image, error) {
 // 	return Process(buf, opts)
 // }
 
-func Process(buf []byte, opts bimg.Options, save save) (out Image, err error) {
+func Process(buf []byte, opts bimg.Options, save save) (out Image, resp string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch value := r.(type) {
@@ -328,19 +329,20 @@ func Process(buf []byte, opts bimg.Options, save save) (out Image, err error) {
 
 	buf, err = bimg.Resize(buf, opts)
 	if err != nil {
-		return Image{}, err
+		return Image{}, "", err
 	}
 
 	if save.BucketName != "" && save.ImageName != "" {
-		resp := uploadToS3(save.BucketName, save.ImageName, buf)
-		return Image{}, resp
+		resp, err := uploadToS3(save.BucketName, save.ImageName, buf)
+		// fmt.Printf("response %s", awsutil.StringValue(resp))
+		return Image{}, resp, err
 
 	}
 	mime := GetImageMimeType(bimg.DetermineImageType(buf))
-	return Image{Body: buf, Mime: mime}, nil
+	return Image{Body: buf, Mime: mime}, "", nil
 }
 
-func uploadToS3(bucketName string, fileName string, buf []byte) error {
+func uploadToS3(bucketName string, fileName string, buf []byte) (response string, err error) {
 
 	acl := "public-read"
 	fileBytes := bytes.NewReader(buf)
@@ -351,8 +353,7 @@ func uploadToS3(bucketName string, fileName string, buf []byte) error {
 	}))
 
 	uploader := s3manager.NewUploader(sess)
-
-	_, err := uploader.Upload(&s3manager.UploadInput{
+	resp, err := uploader.Upload(&s3manager.UploadInput{
 		Bucket:      aws.String(bucketName),
 		ACL:         aws.String(acl),
 		Key:         aws.String(fileName),
@@ -360,6 +361,8 @@ func uploadToS3(bucketName string, fileName string, buf []byte) error {
 		ContentType: aws.String(fileType),
 	})
 
-	return err
+	response = awsutil.StringValue(resp)
+
+	return response, err
 
 }

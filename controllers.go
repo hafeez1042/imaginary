@@ -82,7 +82,7 @@ func imageHandler(w http.ResponseWriter, r *http.Request, buf []byte, Operation 
 		return
 	}
 
-	image, err := Operation.Run(buf, opts)
+	image, resp, err := Operation.Run(buf, opts)
 	if err != nil {
 		ErrorReply(r, w, NewError("Error while processing the image: "+err.Error(), BadRequest), o)
 		return
@@ -90,6 +90,9 @@ func imageHandler(w http.ResponseWriter, r *http.Request, buf []byte, Operation 
 
 	w.Header().Set("Content-Type", image.Mime)
 	w.Write(image.Body)
+	if resp != "" {
+		w.Write([]byte(resp))
+	}
 }
 
 func formController(w http.ResponseWriter, r *http.Request) {
