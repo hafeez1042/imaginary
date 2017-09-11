@@ -361,7 +361,7 @@ func uploadToS3(bucketName string, fileName string, buf []byte) (response string
 		ContentType: aws.String(fileType),
 	})
 
-	response = awsutil.StringValue(resp)
+	response = awsutil.StringValue(resp.Location)
 
 	return response, err
 
